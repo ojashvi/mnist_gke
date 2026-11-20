@@ -1,0 +1,116 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <title>MNIST Digit Recognition</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f4f6fa;
+      padding: 30px;
+    }
+    canvas {
+      background: black;
+      border: 2px solid #555;
+      border-radius: 8px;
+      touch-action: none;
+    }
+    button {
+      padding: 12px 22px;
+      margin: 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>MNIST Digit Recognition</h1>
+  <p>Draw a digit from 0 to 9</p>
+
+  <canvas id="canvas" width="280" height="280"></canvas>
+  <div>
+    <button onclick="clearCanvas()">Clear</button>
+    <button onclick="predict()">Predict</button>
+  </div>
+  <h2 id="result">Prediction: —</h2>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    let drawing = false;
+
+    function clearCanvas() {
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, 280, 280);
+      document.getElementById("result").textContent =
+        "Prediction: —";
+    }
+
+    clearCanvas();
+
+    function position(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (event.clientX - rect.left) *
+           canvas.width / rect.width,
+        y: (event.clientY - rect.top) *
+           canvas.height / rect.height
+      };
+    }
+
+    canvas.addEventListener("pointerdown", event => {
+      drawing = true;
+      canvas.setPointerCapture(event.pointerId);
+      const p = position(event);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+    });
+
+    canvas.addEventListener("pointermove", event => {
+      if (!drawing) return;
+      const p = position(event);
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 22;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    });
+
+    canvas.addEventListener("pointerup", () => {
+      drawing = false;
+    });
+
+    async function predict() {
+      const result = document.getElementById("result");
+      result.textContent = "Predicting...";
+
+      canvas.toBlob(async blob => {
+        try {
+          const form = new FormData();
+          form.append("file", blob, "digit.png");
+
+          const response = await fetch("/predict", {
+            method: "POST",
+            body: form
+          });
+
+          if (!response.ok) {
+            throw new Error("Inference request failed");
+          }
+
+          const data = await response.json();
+          result.textContent =
+            `Prediction: ${data.prediction} ` +
+            `(${(data.confidence * 100).toFixed(1)}%)`;
+        } catch (error) {
+          result.textContent = error.message;
+        }
+      }, "image/png");
+    }
+  </script>
+</body>
+</html>
